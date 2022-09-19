@@ -5,6 +5,7 @@ read bPtable and save to bloomfilter
 @author: iceland
 """
 
+
 import time
 import os
 import sys
@@ -16,8 +17,11 @@ import math
 
 if len(sys.argv) > 3 or len(sys.argv) < 3:
     print('[+] Program Usage.... ')
-    print('{} <input bPfile> <output bloomfile>\n'.format(sys.argv[0]))
-    print('Example to create a File :\n{} FULLbpfile.bin FULLbloomfilter.bin'.format(sys.argv[0]))
+    print(f'{sys.argv[0]} <input bPfile> <output bloomfile>\n')
+    print(
+        f'Example to create a File :\n{sys.argv[0]} FULLbpfile.bin FULLbloomfilter.bin'
+    )
+
     sys.exit()
 
 
@@ -37,7 +41,12 @@ bloom_bits = int(total_entries * bloom_bpe)  # ln(2)**2
 if bloom_bits % 8: bloom_bits = 8*(1 + (bloom_bits//8))
 bloom_hashes = math.ceil(0.693147180559945 * bloom_bpe)
 
-print('bloom bits  :', bloom_bits, '   size [%s MB]'%(bloom_bits//(8*1024*1024)))
+print(
+    'bloom bits  :',
+    bloom_bits,
+    f'   size [{bloom_bits // (8 * 1024 * 1024)} MB]',
+)
+
 print('bloom hashes:', bloom_hashes)
 # =============================================================================
 
@@ -51,8 +60,7 @@ bloom_filter.setall(0)                        # set all bits to 0
 def hashit(dn, bloom_hashes):
     a = int(xxhash.xxh64(dn, seed=0).hexdigest(),16)
     b = int(xxhash.xxh64(dn, seed=a).hexdigest(),16)
-    idx = [(a + b * k)%bloom_bits for k in range(bloom_hashes)]  # get int for bit setting
-    return idx
+    return [(a + b * k)%bloom_bits for k in range(bloom_hashes)]
 
 # set True to all @positions in @bitarr:bitarray
 def update_bloom(positions, bitarr):
@@ -81,17 +89,17 @@ print('[+] Reading Baby table from file ',total_entries,' elements')
 f = open(input_bPfile,'rb')
 
 # ==============Compromize Speed with RAM : Use for normal case ==============
-seq = range(0, total_entries)
+seq = range(total_entries)
 chunk = 1000000
 parts_list = [seq[i * chunk:(i * chunk) + chunk] for i in range(math.ceil(len(seq) / chunk))]
-print('[+] Created {} Chunks ...'.format(len(parts_list)))
+print(f'[+] Created {len(parts_list)} Chunks ...')
 k = 1
 print('[+] Inserting baby table elements in bloom filter: Updating bloom in chunks')
 
 while True:
     baby_bin = bytearray(f.read(chunk*32))
     if not baby_bin: break
-    print('[+] Working on Chunk {} ...'.format(k), end='\r')
+    print(f'[+] Working on Chunk {k} ...', end='\r')
     ll_list = []
     for cnt in range(len(baby_bin)//32):
         one_line = baby_bin[cnt*32:cnt*32+32].hex()
@@ -99,8 +107,8 @@ while True:
         ll_list.extend(ll)
     update_bloom(ll_list, bloom_filter)
     k += 1
-    
-    
+
+
 
 # ==============Too frequent access is slow : Use if you have less RAM ========
 # print('[+] Inserting baby table elements in bloom filter: Updating bloom line by line')
@@ -110,7 +118,7 @@ while True:
 #     update_bloom(ll, bloom_filter)
 #     print('[+] Working on line {} ...'.format(cnt+1), end='\r')
 # =============================================================================
-    
+
 # ===============This is RAM Based fast : Use if you have >32GB RAM ===========
 # print('[+] Creating Table elements in RAM to hash in bloomfilter')
 # baby_steps = [baby_bin[cnt*32:cnt*32+32].hex() for cnt in range(total_entries)]

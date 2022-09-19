@@ -39,7 +39,7 @@ def create_table(m):
     # create a table:  f(x) => G * x
     P = G
     baby_steps = []
-    for x in range(m):
+    for _ in range(m):
         baby_steps.append(P.x)
         P = P + G
     return baby_steps
@@ -52,19 +52,18 @@ valid = os.path.isfile(bs_file)
 if valid == True:
     print('\nFound the Baby Steps Table file: '+bs_file+'. Will be used directly')
     baby_steps = {int(line.split()[0],10):k for k, line in enumerate(open(bs_file,'r'))}
-    if m != len(baby_steps) and not len(baby_steps) == 0: 
+    if m != len(baby_steps) and baby_steps: 
         m = len(baby_steps)
         print('Taken from table. m is adjusted to = ', m)
-    if len(baby_steps) == 0 :
+    if not baby_steps:
         print('Size of the file was 0. It will be created and overwritten')
         valid = False
 if valid == False:
     print('\nNot Found '+bs_file+'. Will Create This File Now. \
           \nIt will save to this file in the First Run. Next run will directly read from this file.')
-    out = open(bs_file,'w')
-    baby_steps = create_table(m)
-    for line in baby_steps: out.write(str(line) + '\n')
-    out.close()
+    with open(bs_file,'w') as out:
+        baby_steps = create_table(m)
+        for line in baby_steps: out.write(str(line) + '\n')
     baby_steps = {line:k for k, line in enumerate(baby_steps)}
 
 
@@ -102,29 +101,29 @@ def findkeys(PointList, k1, k2, k1G, mG, total_found_keys):
     S = [pp - k1G for pp in PointList]
     nb_keys = lookup_in_infinity(S, k1, step, total_found_keys)         # Point at Infinity
     total_found_keys = nb_keys
-    
+
     while total_found_keys <  total_pubkeys and step<(1+k2-k1):
         S, nb_keys = lookup_in_baby_steps(S, k1, step, total_found_keys)
         total_found_keys = nb_keys
         S = [pp - mG for pp in S]   # Giant step
-        step = step + m
-            
+        step += m
+
     return PointList, total_found_keys
 ###############################################################################
 total_found_keys = 0
 
 
-while total_found_keys < total_pubkeys: 
-    # We have to solve P = k.G, we know that k lies in the range ]k1,k2]
+# We have to solve P = k.G, we know that k lies in the range ]k1,k2]
 #    k1 = random.randint(1, curve.secp256k1.q//2)        # if you want to start from a random key
-    k1 = 1                                              # if you want to start from 1 
+k1 = 1                                              # if you want to start from 1 
+while total_found_keys < total_pubkeys: 
     k2 = k1 + m*m
     print('Checking {0} keys from {1}'.format(m*m, hex(k1)))
     # m = math.floor(math.sqrt(k2-k1))
-    
+
     k1G = k1 * G
     mG = m * G
-    
+
     Qlist, total_found_keys = findkeys(Qlist, k1, k2, k1G, mG, total_found_keys)
     time_taken = time.time()-st
     print("Time Spent : {0:.2f} seconds. Speed {1:.2f} Keys/s".format(time_taken, (k2-k1)/time_taken))

@@ -6,6 +6,7 @@ Usage :
 @author: iceland
 @credits: Alberto, Keyhunt gmp library
 """
+
 import time
 import random
 import bit
@@ -35,8 +36,12 @@ args = parser.parse_args()
 
 
 seq = int(args.n) if args.n else 50000000000000
-ss = args.keyspace if args.keyspace else '1:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364140'
-flag_random = True if args.rand else False
+ss = (
+    args.keyspace
+    or '1:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364140'
+)
+
+flag_random = bool(args.rand)
 bs_file = args.bpfile       # 'FULLbpfile.bin'
 bloom_file = args.bloomfile # 'Big_dll_bloom.bin'
 public_key = args.pubkey    # '02CEB6CBBCDBDF5EF7150682150F4CE2C6F4807B349827DCDBDD1F2EFA885A2630'
@@ -47,11 +52,11 @@ b = int(b, 16)
 
 
 if os.path.isfile(bloom_file) == False:
-    print('File {} not found'.format(bloom_file))
+    print(f'File {bloom_file} not found')
     print('create it from : bPfile_2_bloom_dll.py')
     sys.exit()
 if os.path.isfile(bs_file) == False:
-    print('File {} not found'.format(bs_file))
+    print(f'File {bs_file} not found')
     print('Specify the file used to create the bloom filter or create it from : create_bPfile.py. Even little smaller file is OK.')
     sys.exit()
 # ======== 1st Part : File ===============
@@ -63,10 +68,10 @@ lastitem = 0
 
 if platform.system().lower().startswith('win'):
     mylib = ctypes.CDLL('bloom.dll')
-    
+
 elif platform.system().lower().startswith('lin'):
     mylib = ctypes.CDLL('./bloom.so')
-    
+
 else:
     print('[-] Unsupported Platform currently for ctypes dll method. Only [Windows and Linux] is working')
     sys.exit()
@@ -78,23 +83,22 @@ bloom_check_add.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.
 
 ###############################################################################
 def randk(a, b):
-	if flag_random:
-		return random.SystemRandom().randint(a, b)
-	else:
-		if lastitem == 0:
-			return a
-		elif lastitem > b:
-			print('[+] Range Finished')
-			exit()
-		else:
-			return lastitem + 1
+    if flag_random:
+        return random.SystemRandom().randint(a, b)
+    if lastitem == 0:
+    	return a
+    elif lastitem > b:
+    	print('[+] Range Finished')
+    	exit()
+    else:
+    	return lastitem + 1
 
 def scan_str(num):
 	# Kilo/Mega/Giga/Tera/Peta/Exa/Zetta/Yotta
     dict_suffix = {0:'', 1:'Thousands', 2:'Million', 3:'Billion', 4:'Trillion'}
     num *= 1.0
     idx = 0
-    for ii in range(4):
+    for _ in range(4):
         if int(num/1000) > 0:
             idx += 1
             num /= 1000
@@ -189,10 +193,9 @@ def bsgs_exact_key(pubkey_point, z1, z2):
     wG = w * G
     S = pubkey_point -z1G
 #    S2 = Sym_Q + z1G
-    if S == Zp:
-        if z1 * G == pubkey_point:
-            print('BSGS FOUND PrivateKey ', hex(z1))
-            exit()
+    if S == Zp and z1 * G == pubkey_point:
+        print('BSGS FOUND PrivateKey ', hex(z1))
+        exit()
 
     stp = 0
     while stp<(1+z2-z1):
@@ -207,8 +210,8 @@ def bsgs_exact_key(pubkey_point, z1, z2):
                 exit()
             else:
                 S = S - wG
-                stp = stp + w
-                
+                stp += w
+
         else:
             # Giant step
             S = S - wG
@@ -224,26 +227,20 @@ def bsgs_keys(pubkey_point, k1, k2):
         print('BSGS FOUND PrivateKey ', hex(k1))
         found = True
         return found
-    
+
     found = False
     step = 0
-	
-    while found is False and step<(1+k2-k1):
+
+    while not found and step < (1 + k2 - k1):
         hex_line = hex(S.x)[2:].zfill(64)
 #        if check_in_bloom(hashit(hex_line, bloom_hashes, bloom_bits), bloom_bits, bloom_filter) == True:
         if bloom_check_add(bytes.fromhex(hex_line), 32, 0, bloom_bits, bloom_hashes, bloom_filter) > 0:
             bsgs_exact_key(pubkey_point, k1+step, k1+step+m)
-                
-#            print('A False collision ignored between ',hex(k1+step), ' and ', hex(k1+step+m))
-            S = ec.Point_Addition(S, -mG)
-            step = step + m
-            
-# =============================================================================
 
-        else: # Giant step
-            S = ec.Point_Addition(S, -mG)
-            step = step + m
-            
+#            print('A False collision ignored between ',hex(k1+step), ' and ', hex(k1+step+m))
+        S = ec.Point_Addition(S, -mG)
+        step += m
+
     return found
 
 el = 0
