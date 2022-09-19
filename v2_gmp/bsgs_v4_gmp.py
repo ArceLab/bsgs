@@ -5,6 +5,7 @@ Usage :
 
 @author: iceland
 """
+
 import time
 import random
 import gmp_ec as ec
@@ -29,8 +30,12 @@ args = parser.parse_args()
 
 
 seq = int(args.n) if args.n else 20000000000000
-ss = args.keyspace if args.keyspace else '1:7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0'
-flag_random = True if args.rand else False
+ss = (
+    args.keyspace
+    or '1:7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0'
+)
+
+flag_random = bool(args.rand)
 bs_file = args.bpfile       # 'bPfile.bin'
 public_key = args.pubkey    # '02CEB6CBBCDBDF5EF7150682150F4CE2C6F4807B349827DCDBDD1F2EFA885A2630'
 ###############################################################################
@@ -40,7 +45,7 @@ b = int(b, 16)
 
 
 if os.path.isfile(bs_file) == False:
-    print('File {} not found'.format(bs_file))
+    print(f'File {bs_file} not found')
     print('create it from : create_bPfile.py')
     sys.exit()
 # ======== 1st Part : File ===============
@@ -52,20 +57,17 @@ lastitem = 0
 
 ###############################################################################
 def randk(a, b):
-	if flag_random:
-		return random.SystemRandom().randint(a, b)
-	else:
-		if lastitem == 0:
-			return a
-		else:
-			return lastitem + 1
+    if flag_random:
+        return random.SystemRandom().randint(a, b)
+    else:
+        return a if lastitem == 0 else lastitem + 1
 
 def scan_str(num):
 	# Kilo/Mega/Giga/Tera/Peta/Exa/Zetta/Yotta
     dict_suffix = {0:'', 1:'Thousands', 2:'Million', 3:'Billion', 4:'Trillion'}
     num *= 1.0
     idx = 0
-    for ii in range(4):
+    for _ in range(4):
         if int(num/1000) > 0:
             idx += 1
             num /= 1000
@@ -130,11 +132,11 @@ def bsgs_keys(pubkey_point, k1, k2):
         print('PVK found ', hex(k1))
         found = True
         return found
-    
+
     found = False
     step = 0
-	
-    while found is False and step<(1+k2-k1):
+
+    while not found and step < (1 + k2 - k1):
         hex_line = hex(S.x)[2:].zfill(64)
         if hex_line in baby_steps:
             idx = baby_bin.find(bytes.fromhex(hex_line), 0)
@@ -144,8 +146,8 @@ def bsgs_keys(pubkey_point, k1, k2):
 
         else: # Giant step
             S = ec.Point_Addition(S, -mG)
-            step = step + m
-            
+            step += m
+
     return found
 
 el = 0

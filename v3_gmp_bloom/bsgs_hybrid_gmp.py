@@ -5,6 +5,7 @@ Usage :
 
 @author: iceland
 """
+
 import time
 import random
 # import gmpy2
@@ -35,8 +36,12 @@ args = parser.parse_args()
 
 
 seq = int(args.n) if args.n else 8000000000
-ss = args.keyspace if args.keyspace else '1:7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0'
-flag_random = True if args.rand else False
+ss = (
+    args.keyspace
+    or '1:7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0'
+)
+
+flag_random = bool(args.rand)
 bs_file = args.bpfile       # 'FULLbpfile.bin'
 bloom_file = args.bloomfile # 'FULLbloomfilter.bin'
 public_key_file = args.pfile    # '02CEB6CBBCDBDF5EF7150682150F4CE2C6F4807B349827DCDBDD1F2EFA885A2630'
@@ -47,15 +52,15 @@ b = int(b, 16)
 
 
 if os.path.isfile(bloom_file) == False:
-    print('File {} not found'.format(bloom_file))
+    print(f'File {bloom_file} not found')
     print('create it from : bPfile_2_bloom.py')
     sys.exit()
 if os.path.isfile(bs_file) == False:
-    print('File {} not found'.format(bs_file))
+    print(f'File {bs_file} not found')
     print('Specify the file used to create the bloom filter or create it from : create_bPfile.py. Even little smaller file is OK.')
     sys.exit()
 if os.path.isfile(public_key_file) == False:
-    print('File {} not found'.format(public_key_file))
+    print(f'File {public_key_file} not found')
     print('1 pubkey per line in hex format,  in the file (compressed or uncompressed)')
     sys.exit()
 # ======== 1st Part : File ===============
@@ -67,20 +72,17 @@ lastitem = 0
 
 ###############################################################################
 def randk(a, b):
-	if flag_random:
-		return random.SystemRandom().randint(a, b)
-	else:
-		if lastitem == 0:
-			return a
-		else:
-			return lastitem + 1
+    if flag_random:
+        return random.SystemRandom().randint(a, b)
+    else:
+        return a if lastitem == 0 else lastitem + 1
 
 def scan_str(num):
 	# Kilo/Mega/Giga/Tera/Peta/Exa/Zetta/Yotta
     dict_suffix = {0:'', 1:'Thousands', 2:'Million', 3:'Billion', 4:'Trillion'}
     num *= 1.0
     idx = 0
-    for ii in range(4):
+    for _ in range(4):
         if int(num/1000) > 0:
             idx += 1
             num /= 1000
@@ -95,8 +97,7 @@ def pub2point(pub_hex):
 	return ec.Point(x, y)
 
 def read_pubkey_file():
-    publist = [line.split()[0] for line in open(public_key_file,'r')]
-    return publist
+    return [line.split()[0] for line in open(public_key_file,'r')]
 
 def read_FULL_baby_file(num_bytes):
 #    a = array('B')
@@ -113,24 +114,20 @@ def bloom_read_from_file():
     return a
 
 def check_in_bloom(positions, bloom_bits, bitarr):
-    flag = True
-    for loc in positions:
-        if bitarr[loc] == 0 : flag = False
 #        loc1 = bloom_bits-loc-1
 #        if bitarr[loc1] == 0 : flag = False
-    return flag
+    return all(bitarr[loc] != 0 for loc in positions)
 
 def hashit(dn, bloom_hashes, bloom_bits):
     a = int(xxhash.xxh64_hexdigest(dn, seed=0),16)
     b = int(xxhash.xxh64_hexdigest(dn, seed=a),16)
-    idx = [(a + b * k)%bloom_bits for k in range(bloom_hashes)]  # get int for bit setting
-    return idx
+    return [(a + b * k)%bloom_bits for k in range(bloom_hashes)]
 ###############################################################################
 
 st = time.time()
 print('[+] Starting Program : BSGS mode with hybrid algo using bloom')
 Qlist = [ pub2point(line) for line in read_pubkey_file() ]
-print('[+] Loading {} Public Keys to search'.format(len(Qlist)))
+print(f'[+] Loading {len(Qlist)} Public Keys to search')
 # Q = pub2point(public_key)
 
 bloom_filter = bloom_read_from_file()
@@ -185,10 +182,9 @@ def bsgs_exact_key(pubkey_point, z1, z2):
     z1G = z1 * G
     wG = w * G
     S = pubkey_point -z1G
-    if S == Zp:
-        if z1 * G == pubkey_point:
-            print('BSGS FOUND PrivateKey ', hex(z1))
-            return True
+    if S == Zp and z1 * G == pubkey_point:
+        print('BSGS FOUND PrivateKey ', hex(z1))
+        return True
     stp = 0
     while stp<(1+z2-z1):
         hex_line = hex(S.x)[2:].zfill(64)
@@ -202,8 +198,8 @@ def bsgs_exact_key(pubkey_point, z1, z2):
                 return True
             else:
                 S = S - wG
-                stp = stp + w
-                
+                stp += w
+
         else:
             # Giant step
             S = S - wG
@@ -220,26 +216,20 @@ def bsgs_keys(pubkey_point, k1, k2):
         print('BSGS FOUND PrivateKey ', hex(k1))
         found = True
         return found
-    
+
     found = False
     step = 0
-	
-    while found is False and step<(1+k2-k1):
+
+    while not found and step < (1 + k2 - k1):
         hex_line = hex(S.x)[2:].zfill(64)
         if check_in_bloom(hashit(hex_line, bloom_hashes, bloom_bits), bloom_bits, bloom_filter) == True:
             rt = bsgs_exact_key(pubkey_point, k1+step, k1+step+m)
             if rt == True:
                 return True
 #            print('A False collision ignored between ',hex(k1+step), ' and ', hex(k1+step+m))
-            S = ec.Point_Addition(S, -mG)
-            step = step + m
-            
-# =============================================================================
+        S = ec.Point_Addition(S, -mG)
+        step += m
 
-        else: # Giant step
-            S = ec.Point_Addition(S, -mG)
-            step = step + m
-            
     return found
 
 # =============================================================================

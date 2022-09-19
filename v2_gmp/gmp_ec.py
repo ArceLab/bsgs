@@ -69,9 +69,7 @@ class Point:
 
 		mp = Scalar_Multiplication(scalar)
 
-		if mp.x == 0 and mp.y == 0:
-			return self.IDENTITY_ELEMENT
-		return mp
+		return self.IDENTITY_ELEMENT if mp.x == 0 and mp.y == 0 else mp
 # =============================================================================    
 	def __rmul__(self, scalar: int):
 		return self.__mul__(scalar)
@@ -125,15 +123,15 @@ def Scalar_Multiplication(k, A=G, p=modulo):
 # =============================================================================
 
 def create_xpoint_table(start_value, end_value):
-    # create a table:  f(x) => G * x
+	# create a table:  f(x) => G * x
 #    P = G * start_value                        # using operator overloading
-    P = Scalar_Multiplication(start_value, G)
-    baby_steps = []
-    for x in range(start_value, end_value):
-        baby_steps.append(int(P.x))
+	P = Scalar_Multiplication(start_value, G)
+	baby_steps = []
+	for _ in range(start_value, end_value):
+		baby_steps.append(int(P.x))
 #        P = P + G                              # using operator overloading
-        P = Point_Addition(P, G)
-    return baby_steps
+		P = Point_Addition(P, G)
+	return baby_steps
 # =============================================================================
 
 def Point_to_Pubkey(A, compressed=False):
@@ -167,48 +165,45 @@ def bulkInversionModP(in_list):
 # =============================================================================
 
 def generateKeyPairsBulk(pvk_list):
-    count = len(pvk_list)
-    
-    table = []            # generate a table of points G, 2G, 4G, 8G...(2^255)G
-    table.append(G)
-    for i in range(1, 256):
-        table.append(Point_Doubling(table[i-1]))
-    
-    pub_list = [Point.IDENTITY_ELEMENT for i in range(count)]
+	count = len(pvk_list)
+
+	table = [G]
+	table.extend(Point_Doubling(table[i-1]) for i in range(1, 256))
+	pub_list = [Point.IDENTITY_ELEMENT for _ in range(count)]
 
 
-    for i in range(256):
-        runList = []
+	for i in range(256):
+	    runList = []
 #        // calculate (Px - Qx)
-        for j in range(count):
-            k = pvk_list[j]
-            if gmpy2.bit_test(k, i):
-                if pub_list[j] == Point.IDENTITY_ELEMENT:
-                    run = 2
-                else:
-                    run = (pub_list[j].x - table[i].x) % modulo
-            else:
-                run = 2
-            
-            runList.append(run)
-        
+	    for j in range(count):
+	        k = pvk_list[j]
+	        if gmpy2.bit_test(k, i):
+	            if pub_list[j] == Point.IDENTITY_ELEMENT:
+	                run = 2
+	            else:
+	                run = (pub_list[j].x - table[i].x) % modulo
+	        else:
+	            run = 2
+
+	        runList.append(run)
+
 #       // calculate 1/(Px - Qx)
-        runList = bulkInversionModP(runList)
+	    runList = bulkInversionModP(runList)
 #       // complete the addition
-        for j in range(count):
-            k = pvk_list[j]
-            if gmpy2.bit_test(k, i):
-                if pub_list[j] == Point.IDENTITY_ELEMENT:
-                    pub_list[j] = table[i]
-                else:
-                    rise = (pub_list[j].y - table[i].y) % modulo
+	    for j in range(count):
+	        k = pvk_list[j]
+	        if gmpy2.bit_test(k, i):
+	            if pub_list[j] == Point.IDENTITY_ELEMENT:
+	                pub_list[j] = table[i]
+	            else:
+	                rise = (pub_list[j].y - table[i].y) % modulo
 #                   // s = (Py - Qy)/(Px - Qx)
-                    s = rise * runList[j]
+	                s = rise * runList[j]
 #                   //rx = (s*s - px - qx) % _p;
-                    rx = ( s*s - pub_list[j].x - table[i].x ) % modulo
+	                rx = ( s*s - pub_list[j].x - table[i].x ) % modulo
 #                   //ry = (s * (px - rx) - py) % _p;
-                    ry = ((s * (pub_list[j].x - rx)) % modulo - pub_list[j].y ) % modulo
-                
-                    pub_list[j] = Point(rx, ry)
-    
-    return pub_list
+	                ry = ((s * (pub_list[j].x - rx)) % modulo - pub_list[j].y ) % modulo
+
+	                pub_list[j] = Point(rx, ry)
+
+	return pub_list
